@@ -9,6 +9,7 @@ import numpy as np
 import progressbar
 from statsmodels.stats.proportion import proportion_confint
 import time
+import logging
 
 def parallelized(server_class):
     if server_class == Server:
@@ -135,9 +136,9 @@ class falsifier(ABC):
                 suffix = f' for {self.n_iters} iterations'
             if self.max_time:
                 suffix += f' for {self.max_time:.0f} seconds'
-            print('Running falsification' + suffix)
+            logging.info('Running falsification' + suffix)
         if self.verbosity >= 2:
-            print(f'Server class is {type(self.server)}')
+            logging.info(f'Server class is {type(self.server)}')
 
         if self.verbosity >= 1:
             if self.n_iters is not None:
@@ -155,11 +156,28 @@ class falsifier(ABC):
                     self.total_simulate_time += timings.simulate_time
                 except TerminationException:
                     if self.verbosity >= 1:
-                        print("Sampler has generated all possible samples")
+                        logging.info("Sampler has generated all possible samples")
                     break
                 if self.verbosity >= 2:
-                    print("Sample no: ", i, "\nSample: ", sample, "\nRho: ", rho)
+                    logging.info("Sample no: %d\nSample: %s\nRho: %s", i, sample, rho)
                 self.samples[i] = sample
+                
+                # Check for counterexample immediately
+                ce = any([r <= self.fal_thres for r in rho]) if self.multi else rho <= self.fal_thres
+                if ce:
+                    if self.save_error_table:
+                        self.populate_error_table(sample, rho)
+                    ce_num = ce_num + 1
+                    if self.verbosity >= 1:
+                        logging.info("Counterexample found! (%d/%s)", ce_num, self.ce_num_max)
+                    if ce_num >= self.ce_num_max:
+                        if self.verbosity >= 1:
+                            logging.info("Reached maximum counterexamples (%s). Stopping.", self.ce_num_max)
+                            bar.update(i + 1)
+                        break
+                elif self.save_safe_table:
+                    self.populate_error_table(sample, rho, error=False)
+                
                 server_samples.append(sample)
                 rhos.append(rho)
                 i += 1
@@ -175,18 +193,19 @@ class falsifier(ABC):
             if self.verbosity >= 1:
                 bar.finish()
             self.server.terminate()
+        
+        # Process any remaining samples that weren't processed during early termination
         for sample, rho in zip(server_samples, rhos):
             ce = any([r <= self.fal_thres for r in rho]) if self.multi else rho <= self.fal_thres
             if ce:
-                if self.save_error_table:
+                if self.save_error_table and ce_num < self.ce_num_max:
                     self.populate_error_table(sample, rho)
-                ce_num = ce_num + 1
-                if ce_num >= self.ce_num_max:
-                    break
+                    ce_num = ce_num + 1
             elif self.save_safe_table:
                 self.populate_error_table(sample, rho, error=False)
+        
         if self.verbosity >= 1:
-            print('Falsification complete.')
+            logging.info('Falsification complete.')
 
 class generic_falsifier(falsifier):
     def __init__(self,  monitor=None, sampler_type= None, sample_space=None, sampler=None,
