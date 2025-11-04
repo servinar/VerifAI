@@ -81,13 +81,13 @@ class falsifier(ABC):
         if self.save_safe_table:
             self.safe_table = error_table(space = self.server.sample_space)
 
-    def populate_error_table(self, sample, rho, error=True):
+    def populate_error_table(self, sample, rho, error=True, iteration=None):
         if error:
-            self.error_table.update_error_table(sample, rho)
+            self.error_table.update_error_table(sample, rho, iteration=iteration)
             if self.error_table_path:
                 self.write_table(self.error_table.table, self.error_table_path)
         else:
-            self.safe_table.update_error_table(sample, rho)
+            self.safe_table.update_error_table(sample, rho, iteration=iteration)
             if self.safe_table_path:
                 self.write_table(self.safe_table.table, self.safe_table_path)
 
@@ -166,7 +166,7 @@ class falsifier(ABC):
                 ce = any([r <= self.fal_thres for r in rho]) if self.multi else rho <= self.fal_thres
                 if ce:
                     if self.save_error_table:
-                        self.populate_error_table(sample, rho)
+                        self.populate_error_table(sample, rho, iteration=i)
                     ce_num = ce_num + 1
                     if self.verbosity >= 1:
                         logging.info("Counterexample found! (%d/%s)", ce_num, self.ce_num_max)
@@ -176,7 +176,7 @@ class falsifier(ABC):
                             bar.update(i + 1)
                         break
                 elif self.save_safe_table:
-                    self.populate_error_table(sample, rho, error=False)
+                    self.populate_error_table(sample, rho, error=False, iteration=i)
                 
                 server_samples.append(sample)
                 rhos.append(rho)
@@ -195,14 +195,14 @@ class falsifier(ABC):
             self.server.terminate()
         
         # Process any remaining samples that weren't processed during early termination
-        for sample, rho in zip(server_samples, rhos):
+        for idx, (sample, rho) in zip(server_samples, rhos):
             ce = any([r <= self.fal_thres for r in rho]) if self.multi else rho <= self.fal_thres
             if ce:
                 if self.save_error_table and ce_num < self.ce_num_max:
-                    self.populate_error_table(sample, rho)
+                    self.populate_error_table(sample, rho, iteration=idx)
                     ce_num = ce_num + 1
             elif self.save_safe_table:
-                self.populate_error_table(sample, rho, error=False)
+                self.populate_error_table(sample, rho, error=False, iteration=idx)
         
         if self.verbosity >= 1:
             logging.info('Falsification complete.')
@@ -289,9 +289,9 @@ class generic_parallel_falsifier(parallel_falsifier):
             self.samples[i] = sample
             if ce:
                 if self.save_error_table:
-                    self.populate_error_table(sample, rho)
+                    self.populate_error_table(sample, rho, iteration=i)
                 ce_num = ce_num + 1
                 if ce_num >= self.ce_num_max:
                     break
             elif self.save_safe_table:
-                self.populate_error_table(sample, rho, error=False)
+                self.populate_error_table(sample, rho, error=False, iteration=i)

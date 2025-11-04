@@ -14,6 +14,9 @@ class error_table():
             self.space= space
             self.column_names = []
             self.column_type = {}
+            # Add iteration column first
+            self.column_names.append("iteration")
+            self.column_type["iteration"] = True  # numerical
             for i in range(space.fixedFlattenedDimension):
                 self.column_names.append(space.meaningOfFlatCoordinate(i))
                 self.column_type[space.meaningOfFlatCoordinate(i)] = \
@@ -22,6 +25,7 @@ class error_table():
             self.column_type["rho"] = True # Set to numerical by default. Can be updated later.
             self.table = pd.DataFrame(columns=self.column_names)
             self.ignore_locs = []
+            self.current_iteration = 0  # Track current iteration
         else:
             self.table = table
             self.column_names = table.columns
@@ -30,6 +34,7 @@ class error_table():
             else:
                 self.column_type = column_type
             self.ignore_locs = []
+            self.current_iteration = len(table)  # Initialize from existing table
 
 
 
@@ -38,10 +43,20 @@ class error_table():
         self.table.columns = column_names
         self.column_names = column_names
 
-    def update_error_table(self, sample, rho):
+    def update_error_table(self, sample, rho, iteration=None):
         sample = self.space.flatten(sample, fixedDimension=True)
         sample_dict = {}
+        
+        # Add iteration number
+        if iteration is not None:
+            sample_dict["iteration"] = iteration
+        else:
+            sample_dict["iteration"] = self.current_iteration
+        self.current_iteration += 1
+        
         for k, v in zip(self.table.columns, list(sample)):
+            if k == "iteration":  # Skip iteration column in sample data
+                continue
             if np.any(np.array(sample) == None):
                 locs = np.where(np.array(sample) == None)
                 self.ignore_locs = self.ignore_locs + list(locs[0])
