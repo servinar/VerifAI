@@ -126,8 +126,6 @@ class falsifier(ABC):
     def run_falsifier(self):
         i = 0
         ce_num = 0
-        server_samples = []
-        rhos = []
         self.total_sample_time = 0
         self.total_simulate_time = 0
         if self.verbosity >= 1:
@@ -178,8 +176,6 @@ class falsifier(ABC):
                 elif self.save_safe_table:
                     self.populate_error_table(sample, rho, error=False, iteration=i)
                 
-                server_samples.append(sample)
-                rhos.append(rho)
                 i += 1
                 if self.verbosity >= 1:
                     bar.update(i)
@@ -193,16 +189,6 @@ class falsifier(ABC):
             if self.verbosity >= 1:
                 bar.finish()
             self.server.terminate()
-        
-        # Process any remaining samples that weren't processed during early termination
-        for idx, (sample, rho) in enumerate(zip(server_samples, rhos)):
-            ce = any([r <= self.fal_thres for r in rho]) if self.multi else rho <= self.fal_thres
-            if ce:
-                if self.save_error_table and ce_num < self.ce_num_max:
-                    self.populate_error_table(sample, rho, iteration=idx)
-                    ce_num = ce_num + 1
-            elif self.save_safe_table:
-                self.populate_error_table(sample, rho, error=False, iteration=idx)
         
         if self.verbosity >= 1:
             logging.info('Falsification complete.')
