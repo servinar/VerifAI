@@ -54,9 +54,10 @@ class error_table():
             sample_dict["iteration"] = self.current_iteration
         self.current_iteration += 1
         
-        for k, v in zip(self.table.columns, list(sample)):
-            if k == "iteration":  # Skip iteration column in sample data
-                continue
+        # Get parameter columns only (exclude 'iteration' and 'rho')
+        param_columns = [col for col in self.table.columns if col not in ["iteration", "rho"] and not col.startswith("rho_")]
+        
+        for k, v in zip(param_columns, list(sample)):
             if np.any(np.array(sample) == None):
                 locs = np.where(np.array(sample) == None)
                 self.ignore_locs = self.ignore_locs + list(locs[0])

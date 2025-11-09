@@ -195,7 +195,7 @@ class falsifier(ABC):
             self.server.terminate()
         
         # Process any remaining samples that weren't processed during early termination
-        for idx, (sample, rho) in zip(server_samples, rhos):
+        for idx, (sample, rho) in enumerate(zip(server_samples, rhos)):
             ce = any([r <= self.fal_thres for r in rho]) if self.multi else rho <= self.fal_thres
             if ce:
                 if self.save_error_table and ce_num < self.ce_num_max:
